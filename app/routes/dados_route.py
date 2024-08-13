@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from typing import Optional
 from app.services.data_service import get_data
 from app.config import URLS, CATEGORIA_COLUNAS
+import json
 
 router = APIRouter()
 
@@ -43,11 +44,23 @@ async def dados_categoria(
     elif ano_fim:
         colunas_anos = [col for col in colunas_anos if col <= ano_fim]
 
-    # Aplicar filtros para cada coluna base
-    for col in colunas_base:
-        valor_filtro = filters.get(col)
-        if valor_filtro and col in df.columns:
-            df = df[df[col].str.contains(valor_filtro, case=False, na=False)]
+    # Obter dicionário de filtros se existir
+    filter_dict = dict(filters.items())
+    if "filters" in filter_dict:
+        filters_json = filter_dict["filters"]
+        try:
+            filters_dict = json.loads(filters_json)
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=400, detail="Formato de JSON inválido para filtros."
+            )
+
+        # Aplicar filtros para cada coluna base
+        for col in colunas_base:
+            if col in filters_dict:
+                valor_filtro = filters_dict[col]
+                if valor_filtro and col in df.columns:
+                    df = df[df[col].str.contains(valor_filtro, case=False, na=False)]
 
     # Garantir que as colunas base e do(s) ano(s) estejam na resposta
     colunas_resposta = colunas_base + colunas_anos
